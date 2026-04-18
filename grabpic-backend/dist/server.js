@@ -8,7 +8,7 @@ const express_1 = __importDefault(require("express"));
 const cors_1 = __importDefault(require("cors"));
 const helmet_1 = __importDefault(require("helmet"));
 const morgan_1 = __importDefault(require("morgan"));
-const faceDetection_service_1 = require("./services/faceDetection.service");
+const faceDetection_1 = require("./services/faceDetection");
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const images_routes_1 = __importDefault(require("./routes/images.routes"));
@@ -63,7 +63,7 @@ async function bootstrap() {
     try {
         // 1. Load face-api.js models before accepting any requests
         console.log("[Server] Loading face detection models...");
-        await (0, faceDetection_service_1.loadModels)();
+        await (0, faceDetection_1.loadModels)();
         console.log("[Server] ✅ Face models loaded.");
         // 2. Verify Prisma can reach Supabase
         await prisma_1.prisma.$connect();

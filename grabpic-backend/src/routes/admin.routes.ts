@@ -5,7 +5,7 @@ import {
     detectFacesInImage,
     findBestMatch,
     serializeDescriptor,
-} from "../services/faceDetection.service";
+} from "../services/faceDetection";
 import { prisma } from "../utils/prisma";
 
 const router = Router();

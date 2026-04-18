@@ -6,7 +6,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const express_1 = require("express");
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const faceDetection_service_1 = require("../services/faceDetection.service");
+const faceDetection_1 = require("../services/faceDetection");
 const prisma_1 = require("../utils/prisma");
 const router = (0, express_1.Router)();
 /** Supported image extensions */
@@ -59,7 +59,7 @@ router.post("/crawl", async (_req, res, next) => {
             const filePath = path_1.default.join(SAMPLE_IMAGES_DIR, fileName);
             try {
                 // Detect faces
-                const descriptors = await (0, faceDetection_service_1.detectFacesInImage)(filePath);
+                const descriptors = await (0, faceDetection_1.detectFacesInImage)(filePath);
                 if (descriptors.length === 0) {
                     console.log(`[Crawl] No faces in: ${fileName}`);
                     continue;
@@ -77,13 +77,13 @@ router.post("/crawl", async (_req, res, next) => {
                     const existingFaces = await prisma_1.prisma.face.findMany({
                         select: { grabId: true, descriptor: true },
                     });
-                    const match = (0, faceDetection_service_1.findBestMatch)(descriptor, existingFaces);
+                    const match = (0, faceDetection_1.findBestMatch)(descriptor, existingFaces);
                     let faceId;
                     if (match === null) {
                         // New face — create record
                         const newFace = await prisma_1.prisma.face.create({
                             data: {
-                                descriptor: (0, faceDetection_service_1.serializeDescriptor)(descriptor),
+                                descriptor: (0, faceDetection_1.serializeDescriptor)(descriptor),
                             },
                         });
                         faceId = newFace.grabId;

@@ -2,10 +2,7 @@ import { Router, Request, Response, NextFunction } from "express";
 import multer from "multer";
 import fs from "fs";
 import path from "path";
-import {
-    detectFacesInImage,
-    findBestMatch,
-} from "../services/faceDetection.service";
+import { detectFacesInImage, findBestMatch } from "../services/faceDetection";
 import { prisma } from "../utils/prisma";
 
 const router = Router();

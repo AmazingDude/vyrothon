@@ -7,7 +7,7 @@ const express_1 = require("express");
 const multer_1 = __importDefault(require("multer"));
 const fs_1 = __importDefault(require("fs"));
 const path_1 = __importDefault(require("path"));
-const faceDetection_service_1 = require("../services/faceDetection.service");
+const faceDetection_1 = require("../services/faceDetection");
 const prisma_1 = require("../utils/prisma");
 const router = (0, express_1.Router)();
 // ─── Multer config ─────────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ upload.single("image"), async (req, res, next) => {
             return;
         }
         // ── 2. Detect faces ────────────────────────────────────────────────
-        const descriptors = await (0, faceDetection_service_1.detectFacesInImage)(uploadedPath);
+        const descriptors = await (0, faceDetection_1.detectFacesInImage)(uploadedPath);
         if (descriptors.length === 0) {
             cleanupFile(uploadedPath);
             res.status(400).json({
@@ -102,7 +102,7 @@ upload.single("image"), async (req, res, next) => {
             return;
         }
         // ── 4. Compare and find best match ─────────────────────────────────
-        const match = (0, faceDetection_service_1.findBestMatch)(selfieDescriptor, allFaces);
+        const match = (0, faceDetection_1.findBestMatch)(selfieDescriptor, allFaces);
         cleanupFile(uploadedPath);
         if (match === null) {
             res.status(200).json({
