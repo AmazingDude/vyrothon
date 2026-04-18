@@ -29,9 +29,9 @@ function App() {
 
     const checkApi = async () => {
       try {
-        const res = await fetch(`${API_BASE}/admin/crawl`, { method: 'GET' })
+        const res = await fetch(`${API_BASE}/health`, { method: 'GET' })
         if (mounted) {
-          setApiOnline(res.status < 500)
+          setApiOnline(res.ok)
         }
       } catch {
         if (mounted) {
@@ -144,17 +144,23 @@ function App() {
       const result = {
         grabId: data.grabId || '',
         confidence: normalizedConfidence,
+        error: data.error || '',
         success: Boolean(data.success ?? data.grabId),
       }
 
       setSelfieResult(result)
+
+      if (!result.success) {
+        showToast(result.error || 'No matching face found.', 'error')
+        return
+      }
 
       if (result.grabId) {
         setGrabIdInput(result.grabId)
         await fetchPhotos(result.grabId)
       }
 
-      showToast(result.success ? 'Authentication succeeded.' : 'Authentication failed.', result.success ? 'success' : 'error')
+      showToast('Authentication succeeded.', 'success')
     } catch (error) {
       showToast(error.message || 'Selfie authentication failed.', 'error')
     } finally {
@@ -193,11 +199,15 @@ function App() {
       }
 
       const data = await res.json()
-      const list = Array.isArray(data)
+      const rawList = Array.isArray(data)
         ? data
         : Array.isArray(data.images)
           ? data.images
           : []
+
+      const list = rawList
+        .map((entry) => (typeof entry === 'string' ? entry : entry?.filePath))
+        .filter(Boolean)
 
       setPhotos(list)
       showToast(`Loaded ${list.length} image${list.length === 1 ? '' : 's'}.`)

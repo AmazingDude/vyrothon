@@ -32,6 +32,20 @@ app.use("/auth", authRoutes);
 app.use("/images", imagesRoutes);
 app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get("/", (_req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Grabpic backend is running.",
+        endpoints: {
+            health: "/health",
+            docs: "/api-docs",
+            crawl: "POST /admin/crawl",
+            selfieAuth: "POST /auth/selfie",
+            imagesByGrabId: "GET /images/:grabId",
+        },
+    });
+});
+
 // ─── Health check ──────────────────────────────────────────────────────────────
 
 app.get("/health", (_req, res) => {
