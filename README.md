@@ -21,12 +21,15 @@ Grabpic provides a lightweight API to:
 ## API Endpoints
 
 ### 1) POST `/admin/crawl`
+
 Crawls the `sample-images` directory, detects faces, and assigns/updates `grab_id` values.
 
 ### 2) POST `/auth/selfie`
+
 Accepts an uploaded selfie and returns the best matching `grab_id` with confidence score.
 
 ### 3) GET `/images/:grabId`
+
 Returns all image paths associated with the provided `grab_id`.
 
 ## Getting Started
@@ -40,49 +43,52 @@ Returns all image paths associated with the provided `grab_id`.
 ### Setup
 
 1. Clone the repository:
-   ```bash
-   git clone https://github.com/AmazingDude/vyrothon.git
-   cd vyrothon/grabpic-backend
-   ```
+    ```bash
+    git clone https://github.com/AmazingDude/vyrothon.git
+    cd vyrothon/grabpic-backend
+    ```
 2. Install dependencies:
-   ```bash
-   npm install
-   ```
+    ```bash
+    npm install
+    ```
 3. Create a `.env` file in `grabpic-backend` with your Supabase connection values:
-   ```env
-   DATABASE_URL="your_supabase_database_url"
-   DIRECT_URL="your_supabase_direct_url"
-   ```
+    ```env
+    DATABASE_URL="your_supabase_database_url"
+    DIRECT_URL="your_supabase_direct_url"
+    ```
 4. Generate Prisma client:
-   ```bash
-   npx prisma generate
-   ```
+    ```bash
+    npx prisma generate
+    ```
 5. Run migrations:
-   ```bash
-   npx prisma migrate dev --name init
-   ```
+    ```bash
+    npx prisma migrate dev --name init
+    ```
 6. Add face images to the `sample-images` folder.
 7. Start the development server:
-   ```bash
-   npm run dev
-   ```
+    ```bash
+    npm run dev
+    ```
 
 By default, the API runs at `http://localhost:3000`.
 
 ## cURL Examples
 
 ### Crawl and index faces
+
 ```bash
 curl -X POST http://localhost:3000/admin/crawl
 ```
 
 ### Selfie authentication
+
 ```bash
 curl -X POST http://localhost:3000/auth/selfie \
   -F "image=@/absolute/path/to/selfie.jpg"
 ```
 
 ### Fetch images by grab_id
+
 ```bash
 curl http://localhost:3000/images/<grabId>
 ```
@@ -91,3 +97,19 @@ curl http://localhost:3000/images/<grabId>
 
 - Ensure the server is running before executing API requests.
 - For best matching accuracy, use clear, front-facing face images in `sample-images` and selfie uploads.
+
+## Architecture & Design
+
+### System Flow
+
+1. CRAWL: Server reads /sample-images -> face-api.js detects all faces per image -> each unique face gets a grab_id -> stored in Supabase via ImageFace mapping table
+
+2. AUTH: User uploads selfie -> face descriptor extracted -> compared against all known descriptors using cosine similarity (threshold: 0.6) -> matching grab_id returned
+
+3. RETRIEVAL: grab_id used to query ImageFace junction table -> all linked images returned
+
+### Database Schema
+
+- Image: stores file paths
+- Face: stores grab_id + 128-dim face descriptor
+- ImageFace: many-to-many junction (one image, many faces)

@@ -8,6 +8,8 @@ import { loadModels } from "./services/faceDetection";
 import adminRoutes from "./routes/admin.routes";
 import authRoutes from "./routes/auth.routes";
 import imagesRoutes from "./routes/images.routes";
+import { swaggerUi, swaggerSpec } from "./swagger";
+import { errorHandler, notFoundHandler } from "./middleware/errorHandler";
 import { prisma } from "./utils/prisma";
 
 // ─── App + Prisma ──────────────────────────────────────────────────────────────
@@ -28,6 +30,7 @@ app.use(express.urlencoded({ extended: true }));
 app.use("/admin", adminRoutes);
 app.use("/auth", authRoutes);
 app.use("/images", imagesRoutes);
+app.use("/api-docs", swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // ─── Health check ──────────────────────────────────────────────────────────────
 
@@ -35,38 +38,10 @@ app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
-// ─── 404 handler ──────────────────────────────────────────────────────────────
+// ─── 404 + Global error handler ───────────────────────────────────────────────
 
-app.use((_req, res) => {
-    res.status(404).json({ success: false, error: "Route not found." });
-});
-
-// ─── Global error handler ──────────────────────────────────────────────────────
-
-app.use(
-    (
-        err: Error,
-        _req: express.Request,
-        res: express.Response,
-        _next: express.NextFunction,
-    ) => {
-        // Multer errors (file size, unexpected field, etc.)
-        if (err.name === "MulterError") {
-            res.status(400).json({ success: false, error: err.message });
-            return;
-        }
-
-        console.error("[Error]", err);
-
-        res.status(500).json({
-            success: false,
-            error:
-                process.env["NODE_ENV"] === "production"
-                    ? "Internal server error."
-                    : err.message,
-        });
-    },
-);
+app.use(notFoundHandler);
+app.use(errorHandler);
 
 // ─── Graceful shutdown ─────────────────────────────────────────────────────────
 

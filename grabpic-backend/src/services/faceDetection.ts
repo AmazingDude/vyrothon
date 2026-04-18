@@ -1,5 +1,7 @@
 import crypto from "crypto";
 import fs from "fs/promises";
+import path from "path";
+import { Canvas, Image, ImageData, loadImage } from "canvas";
 
 // ─── Types ─────────────────────────────────────────────────────────────────────
 
@@ -23,27 +25,61 @@ const DESCRIPTOR_LENGTH = 128;
 // ─── Model loading ─────────────────────────────────────────────────────────────
 
 let modelsLoaded = false;
+let faceApiReady = false;
+let faceapiLib: any = null;
 
 /**
- * Runtime-safe no-op model bootstrap.
- * Keeps server startup stable on environments where native tfjs bindings are unavailable.
+ * Load face-api detection and recognition networks from disk once.
  */
 export async function loadModels(): Promise<void> {
     if (modelsLoaded) return;
+
+    try {
+        faceapiLib = await import("@vladmandic/face-api");
+        faceapiLib.env.monkeyPatch({ Canvas, Image, ImageData });
+
+        const modelPath = path.resolve(
+            process.cwd(),
+            process.env["FACE_MODELS_DIR"] ?? "models",
+        );
+
+        await Promise.all([
+            faceapiLib.nets.ssdMobilenetv1.loadFromDisk(modelPath),
+            faceapiLib.nets.faceLandmark68Net.loadFromDisk(modelPath),
+            faceapiLib.nets.faceRecognitionNet.loadFromDisk(modelPath),
+        ]);
+
+        faceApiReady = true;
+        console.log("[FaceDetection] Models loaded from disk:", modelPath);
+    } catch (err) {
+        faceApiReady = false;
+        faceapiLib = null;
+        console.warn(
+            "[FaceDetection] face-api unavailable (missing @tensorflow/tfjs-node or model setup). Falling back to deterministic descriptors.",
+        );
+        if (err instanceof Error) {
+            console.warn(`[FaceDetection] Reason: ${err.message}`);
+        }
+    }
+
     modelsLoaded = true;
-    console.log("[FaceDetection] Fallback descriptor engine initialized.");
 }
 
 // ─── Detection ─────────────────────────────────────────────────────────────────
 
 function bytesToUnitFloat(value: number): number {
-    // Map byte [0..255] -> float [-1..1]
     return value / 127.5 - 1;
 }
 
-function generateDescriptorFromBuffer(buffer: Buffer): Float32Array {
-    // Hash image bytes for deterministic identity vectors.
-    const digest = crypto.createHash("sha512").update(buffer).digest();
+function generateDescriptorFromBuffer(
+    buffer: Buffer,
+    salt: string,
+): Float32Array {
+    const digest = crypto
+        .createHash("sha512")
+        .update(salt)
+        .update(buffer)
+        .digest();
     const descriptor = new Float32Array(DESCRIPTOR_LENGTH);
 
     for (let i = 0; i < DESCRIPTOR_LENGTH; i++) {
@@ -55,8 +91,7 @@ function generateDescriptorFromBuffer(buffer: Buffer): Float32Array {
 }
 
 /**
- * Generate a deterministic 128-d descriptor from image bytes.
- * Returns one descriptor per image to keep API behavior predictable.
+ * Detect all faces in an image and return a descriptor for each face.
  */
 export async function detectFacesInImage(
     imagePath: string,
@@ -68,7 +103,22 @@ export async function detectFacesInImage(
         return [];
     }
 
-    return [generateDescriptorFromBuffer(image)];
+    if (!faceApiReady || !faceapiLib) {
+        return [generateDescriptorFromBuffer(image, imagePath)];
+    }
+
+    const input = await loadImage(imagePath);
+
+    const detections = await faceapiLib
+        .detectAllFaces(input)
+        .withFaceLandmarks()
+        .withFaceDescriptors();
+
+    if (detections.length === 0) {
+        return [];
+    }
+
+    return detections.map((detection) => detection.descriptor);
 }
 
 // ─── Matching ──────────────────────────────────────────────────────────────────
