@@ -57,6 +57,9 @@ export async function loadModels(): Promise<void> {
         console.warn(
             "[FaceDetection] face-api unavailable (missing @tensorflow/tfjs-node or model setup). Falling back to deterministic descriptors.",
         );
+        console.warn(
+            "[FaceDetection] Fallback mode only matches near-identical images, not true cross-photo face recognition.",
+        );
         if (err instanceof Error) {
             console.warn(`[FaceDetection] Reason: ${err.message}`);
         }
@@ -71,13 +74,9 @@ function bytesToUnitFloat(value: number): number {
     return value / 127.5 - 1;
 }
 
-function generateDescriptorFromBuffer(
-    buffer: Buffer,
-    salt: string,
-): Float32Array {
+function generateDescriptorFromBuffer(buffer: Buffer): Float32Array {
     const digest = crypto
         .createHash("sha512")
-        .update(salt)
         .update(buffer)
         .digest();
     const descriptor = new Float32Array(DESCRIPTOR_LENGTH);
@@ -104,7 +103,7 @@ export async function detectFacesInImage(
     }
 
     if (!faceApiReady || !faceapiLib) {
-        return [generateDescriptorFromBuffer(image, imagePath)];
+        return [generateDescriptorFromBuffer(image)];
     }
 
     const input = await loadImage(imagePath);
@@ -118,7 +117,7 @@ export async function detectFacesInImage(
         return [];
     }
 
-    return detections.map((detection) => detection.descriptor);
+    return detections.map((detection: any) => detection.descriptor);
 }
 
 // ─── Matching ──────────────────────────────────────────────────────────────────

@@ -12,6 +12,8 @@ const faceDetection_1 = require("./services/faceDetection");
 const admin_routes_1 = __importDefault(require("./routes/admin.routes"));
 const auth_routes_1 = __importDefault(require("./routes/auth.routes"));
 const images_routes_1 = __importDefault(require("./routes/images.routes"));
+const swagger_1 = require("./swagger");
+const errorHandler_1 = require("./middleware/errorHandler");
 const prisma_1 = require("./utils/prisma");
 // ─── App + Prisma ──────────────────────────────────────────────────────────────
 const app = (0, express_1.default)();
@@ -26,29 +28,27 @@ app.use(express_1.default.urlencoded({ extended: true }));
 app.use("/admin", admin_routes_1.default);
 app.use("/auth", auth_routes_1.default);
 app.use("/images", images_routes_1.default);
+app.use("/api-docs", swagger_1.swaggerUi.serve, swagger_1.swaggerUi.setup(swagger_1.swaggerSpec));
+app.get("/", (_req, res) => {
+    res.status(200).json({
+        success: true,
+        message: "Grabpic backend is running.",
+        endpoints: {
+            health: "/health",
+            docs: "/api-docs",
+            crawl: "POST /admin/crawl",
+            selfieAuth: "POST /auth/selfie",
+            imagesByGrabId: "GET /images/:grabId",
+        },
+    });
+});
 // ─── Health check ──────────────────────────────────────────────────────────────
 app.get("/health", (_req, res) => {
     res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
-// ─── 404 handler ──────────────────────────────────────────────────────────────
-app.use((_req, res) => {
-    res.status(404).json({ success: false, error: "Route not found." });
-});
-// ─── Global error handler ──────────────────────────────────────────────────────
-app.use((err, _req, res, _next) => {
-    // Multer errors (file size, unexpected field, etc.)
-    if (err.name === "MulterError") {
-        res.status(400).json({ success: false, error: err.message });
-        return;
-    }
-    console.error("[Error]", err);
-    res.status(500).json({
-        success: false,
-        error: process.env["NODE_ENV"] === "production"
-            ? "Internal server error."
-            : err.message,
-    });
-});
+// ─── 404 + Global error handler ───────────────────────────────────────────────
+app.use(errorHandler_1.notFoundHandler);
+app.use(errorHandler_1.errorHandler);
 // ─── Graceful shutdown ─────────────────────────────────────────────────────────
 async function shutdown(signal) {
     console.log(`\n[Server] ${signal} received — shutting down gracefully...`);
