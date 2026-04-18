@@ -1,0 +1,41 @@
+// Prisma schema for GrabPic – facial recognition system
+// Docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─── Models ───────────────────────────────────────────────────────────────────
+
+model Image {
+  id         String      @id @default(uuid())
+  filePath   String      @unique
+  uploadedAt DateTime    @default(now())
+  faces      ImageFace[]
+
+  @@index([filePath])
+}
+
+model Face {
+  grabId     String      @id @default(uuid())
+  descriptor String      @db.Text   // JSON-serialised Float32Array (128 values)
+  createdAt  DateTime    @default(now())
+  images     ImageFace[]
+
+  @@index([grabId])
+}
+
+model ImageFace {
+  id      String @id @default(uuid())
+  imageId String
+  faceId  String
+
+  image Image @relation(fields: [imageId], references: [id], onDelete: Cascade)
+  face  Face  @relation(fields: [faceId], references: [grabId], onDelete: Cascade)
+
+  @@unique([imageId, faceId])
+}

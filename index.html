@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Grabpic – Intelligent Identity & Retrieval Engine</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@3.4.1/dist/tailwind.min.css" rel="stylesheet">
+  <style>
+    html { background: #18181b; }
+    .toast { transition: opacity 0.3s; }
+    .spinner { border-top-color: #6366f1; animation: spin 1s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .dropzone.dragover { border-color: #6366f1; background: #232336; }
+  </style>
+</head>
+<body class="bg-zinc-900 text-zinc-100 min-h-screen font-sans">
+  <!-- Toasts -->
+  <div id="toast-container" class="fixed top-6 right-6 z-50 space-y-2"></div>
+
+  <!-- Header -->
+  <header class="py-8 px-4 flex flex-col items-center border-b border-zinc-800">
+    <h1 class="text-4xl font-bold tracking-tight text-indigo-400">Grabpic</h1>
+    <p class="text-zinc-400 mt-2 text-lg">Intelligent Identity & Retrieval Engine</p>
+    <div class="flex items-center mt-4">
+      <span id="api-status" class="flex items-center text-sm px-3 py-1 rounded-full bg-zinc-800 text-zinc-400">
+        <span class="inline-block w-2 h-2 rounded-full mr-2 bg-zinc-500"></span>
+        Checking API...
+      </span>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto py-10 px-4 space-y-12">
+    <!-- Section 1: Crawl & Index Faces -->
+    <section class="bg-zinc-800 rounded-xl p-8 shadow-lg">
+      <h2 class="text-2xl font-semibold mb-4">Crawl & Index Faces</h2>
+      <button id="crawl-btn" class="relative w-full py-4 text-lg font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition flex items-center justify-center disabled:opacity-60">
+        <span id="crawl-btn-text">Start Crawling</span>
+        <span id="crawl-spinner" class="hidden ml-3 spinner w-5 h-5 border-2 border-zinc-200 border-t-indigo-400 rounded-full"></span>
+      </button>
+      <div id="crawl-result" class="mt-6 hidden">
+        <div class="bg-zinc-900 rounded-lg p-4 border border-zinc-700">
+          <div class="flex flex-wrap gap-4 text-sm">
+            <div><span class="text-zinc-400">Total Images:</span> <span id="crawl-totalImages" class="font-bold"></span></div>
+            <div><span class="text-zinc-400">Faces Detected:</span> <span id="crawl-totalFacesDetected" class="font-bold"></span></div>
+            <div><span class="text-zinc-400">New Faces Added:</span> <span id="crawl-newFacesAdded" class="font-bold"></span></div>
+            <div><span class="text-zinc-400">Processing Time:</span> <span id="crawl-processingTime" class="font-bold"></span></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 2: Selfie Authentication -->
+    <section class="bg-zinc-800 rounded-xl p-8 shadow-lg">
+      <h2 class="text-2xl font-semibold mb-4">Selfie Authentication</h2>
+      <form id="selfie-form" class="space-y-4" autocomplete="off">
+        <div id="dropzone" class="dropzone flex flex-col items-center justify-center border-2 border-dashed border-zinc-600 rounded-lg p-6 cursor-pointer transition bg-zinc-900 hover:border-indigo-500">
+          <input type="file" id="selfie-input" accept="image/*" class="hidden" />
+          <span id="dropzone-text" class="text-zinc-400">Drag & drop or click to upload a selfie</span>
+          <img id="selfie-preview" class="mt-4 max-h-40 rounded-lg hidden" alt="Preview" />
+        </div>
+        <button id="selfie-btn" type="submit" class="relative w-full py-3 text-lg font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition flex items-center justify-center disabled:opacity-60">
+          <span id="selfie-btn-text">Find My Photos</span>
+          <span id="selfie-spinner" class="hidden ml-3 spinner w-5 h-5 border-2 border-zinc-200 border-t-indigo-400 rounded-full"></span>
+        </button>
+      </form>
+      <div id="selfie-result" class="mt-6 hidden">
+        <div class="bg-zinc-900 rounded-lg p-4 border border-zinc-700 flex flex-col gap-2">
+          <div><span class="text-zinc-400">GrabID:</span> <span id="selfie-grabId" class="font-bold"></span></div>
+          <div><span class="text-zinc-400">Confidence:</span> <span id="selfie-confidence" class="font-bold"></span></div>
+          <div id="selfie-status-badge"></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Section 3: My Photos -->
+    <section class="bg-zinc-800 rounded-xl p-8 shadow-lg">
+      <h2 class="text-2xl font-semibold mb-4">My Photos</h2>
+      <form id="photos-form" class="flex gap-2 mb-4">
+        <input id="photos-grabid" type="text" placeholder="Enter GrabID" class="flex-1 px-3 py-2 rounded-lg bg-zinc-900 border border-zinc-700 text-zinc-100 focus:outline-none focus:border-indigo-500" />
+        <button id="photos-btn" type="submit" class="relative px-6 py-2 font-bold rounded-lg bg-indigo-600 hover:bg-indigo-700 transition flex items-center justify-center disabled:opacity-60">
+          <span id="photos-btn-text">Fetch Images</span>
+          <span id="photos-spinner" class="hidden ml-2 spinner w-4 h-4 border-2 border-zinc-200 border-t-indigo-400 rounded-full"></span>
+        </button>
+      </form>
+      <div id="photos-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <script>
+    // Toasts
+    function showToast(msg, type = 'success') {
+      const toast = document.createElement('div');
+      toast.className = `toast px-4 py-2 rounded shadow-lg text-sm font-medium ${type === 'success' ? 'bg-green-600 text-white' : 'bg-red-600 text-white'}`;
+      toast.textContent = msg;
+      document.getElementById('toast-container').appendChild(toast);
+      setTimeout(() => { toast.style.opacity = 0; setTimeout(() => toast.remove(), 300); }, 3000);
+    }
+
+    // API Status
+    async function checkApiStatus() {
+      const el = document.getElementById('api-status');
+      try {
+        const res = await fetch('http://localhost:3000/admin/crawl', { method: 'GET' });
+        if (res.ok) {
+          el.innerHTML = '<span class="inline-block w-2 h-2 rounded-full mr-2 bg-green-500"></span>API Online';
+          el.classList.remove('text-zinc-400');
+          el.classList.add('text-green-400');
+        } else {
+          throw new Error('API offline');
+        }
+      } catch {
+        el.innerHTML = '<span class="inline-block w-2 h-2 rounded-full mr-2 bg-red-500"></span>API Offline';
+        el.classList.remove('text-zinc-400');
+        el.classList.add('text-red-400');
+      }
+    }
+    checkApiStatus();
+    setInterval(checkApiStatus, 10000);
+
+    // Crawl & Index Faces
+    const crawlBtn = document.getElementById('crawl-btn');
+    const crawlBtnText = document.getElementById('crawl-btn-text');
+    const crawlSpinner = document.getElementById('crawl-spinner');
+    const crawlResult = document.getElementById('crawl-result');
+    crawlBtn.addEventListener('click', async () => {
+      crawlBtn.disabled = true;
+      crawlBtnText.textContent = 'Crawling...';
+      crawlSpinner.classList.remove('hidden');
+      crawlResult.classList.add('hidden');
+      try {
+        const res = await fetch('http://localhost:3000/admin/crawl', { method: 'POST' });
+        if (!res.ok) throw new Error('Crawl failed');
+        const data = await res.json();
+        document.getElementById('crawl-totalImages').textContent = data.totalImages;
+        document.getElementById('crawl-totalFacesDetected').textContent = data.totalFacesDetected;
+        document.getElementById('crawl-newFacesAdded').textContent = data.newFacesAdded;
+        document.getElementById('crawl-processingTime').textContent = data.processingTime;
+        crawlResult.classList.remove('hidden');
+        showToast('Crawl completed!', 'success');
+      } catch (e) {
+        showToast(e.message || 'Crawl failed', 'error');
+      } finally {
+        crawlBtn.disabled = false;
+        crawlBtnText.textContent = 'Start Crawling';
+        crawlSpinner.classList.add('hidden');
+      }
+    });
+
+    // Selfie Authentication
+    const dropzone = document.getElementById('dropzone');
+    const selfieInput = document.getElementById('selfie-input');
+    const selfiePreview = document.getElementById('selfie-preview');
+    const selfieForm = document.getElementById('selfie-form');
+    const selfieBtn = document.getElementById('selfie-btn');
+    const selfieBtnText = document.getElementById('selfie-btn-text');
+    const selfieSpinner = document.getElementById('selfie-spinner');
+    const selfieResult = document.getElementById('selfie-result');
+    let selfieFile = null;
+
+    // Drag & drop
+    dropzone.addEventListener('click', () => selfieInput.click());
+    dropzone.addEventListener('dragover', e => { e.preventDefault(); dropzone.classList.add('dragover'); });
+    dropzone.addEventListener('dragleave', e => { e.preventDefault(); dropzone.classList.remove('dragover'); });
+    dropzone.addEventListener('drop', e => {
+      e.preventDefault();
+      dropzone.classList.remove('dragover');
+      const file = e.dataTransfer.files[0];
+      if (file && file.type.startsWith('image/')) {
+        selfieFile = file;
+        previewSelfie(file);
+      }
+    });
+    selfieInput.addEventListener('change', e => {
+      const file = e.target.files[0];
+      if (file && file.type.startsWith('image/')) {
+        selfieFile = file;
+        previewSelfie(file);
+      }
+    });
+    function previewSelfie(file) {
+      const reader = new FileReader();
+      reader.onload = e => {
+        selfiePreview.src = e.target.result;
+        selfiePreview.classList.remove('hidden');
+        document.getElementById('dropzone-text').classList.add('hidden');
+      };
+      reader.readAsDataURL(file);
+    }
+
+    selfieForm.addEventListener('submit', async e => {
+      e.preventDefault();
+      if (!selfieFile) {
+        showToast('Please upload a selfie', 'error');
+        return;
+      }
+      selfieBtn.disabled = true;
+      selfieBtnText.textContent = 'Authenticating...';
+      selfieSpinner.classList.remove('hidden');
+      selfieResult.classList.add('hidden');
+      try {
+        const formData = new FormData();
+        formData.append('image', selfieFile);
+        const res = await fetch('http://localhost:3000/auth/selfie', {
+          method: 'POST',
+          body: formData
+        });
+        if (!res.ok) throw new Error('Authentication failed');
+        const data = await res.json();
+        document.getElementById('selfie-grabId').textContent = data.grabId;
+        document.getElementById('selfie-confidence').textContent = (data.confidence * 100).toFixed(2) + '%';
+        document.getElementById('selfie-status-badge').innerHTML = data.success
+          ? '<span class="inline-block px-3 py-1 rounded-full bg-green-600 text-white font-semibold">Success</span>'
+          : '<span class="inline-block px-3 py-1 rounded-full bg-red-600 text-white font-semibold">Failure</span>';
+        selfieResult.classList.remove('hidden');
+        showToast('Authentication complete', data.success ? 'success' : 'error');
+        // Auto-populate My Photos
+        if (data.grabId) {
+          document.getElementById('photos-grabid').value = data.grabId;
+          fetchPhotos(data.grabId);
+        }
+      } catch (e) {
+        showToast(e.message || 'Authentication failed', 'error');
+      } finally {
+        selfieBtn.disabled = false;
+        selfieBtnText.textContent = 'Find My Photos';
+        selfieSpinner.classList.add('hidden');
+      }
+    });
+
+    // My Photos
+    const photosForm = document.getElementById('photos-form');
+    const photosBtn = document.getElementById('photos-btn');
+    const photosBtnText = document.getElementById('photos-btn-text');
+    const photosSpinner = document.getElementById('photos-spinner');
+    const photosGrid = document.getElementById('photos-grid');
+    photosForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const grabId = document.getElementById('photos-grabid').value.trim();
+      if (!grabId) {
+        showToast('Please enter a GrabID', 'error');
+        return;
+      }
+      fetchPhotos(grabId);
+    });
+    async function fetchPhotos(grabId) {
+      photosBtn.disabled = true;
+      photosBtnText.textContent = 'Fetching...';
+      photosSpinner.classList.remove('hidden');
+      photosGrid.innerHTML = '';
+      try {
+        const res = await fetch(`http://localhost:3000/images/${encodeURIComponent(grabId)}`);
+        if (!res.ok) throw new Error('Failed to fetch images');
+        const data = await res.json();
+        if (!Array.isArray(data) || data.length === 0) {
+          photosGrid.innerHTML = '<div class="col-span-2 text-zinc-400">No images found.</div>';
+        } else {
+          photosGrid.innerHTML = data.map(path => `<img src="${path}" alt="Photo" class="rounded-lg shadow border border-zinc-700 bg-zinc-900 object-cover w-full h-40" loading="lazy" />`).join('');
+        }
+        showToast('Images loaded', 'success');
+      } catch (e) {
+        showToast(e.message || 'Failed to fetch images', 'error');
+      } finally {
+        photosBtn.disabled = false;
+        photosBtnText.textContent = 'Fetch Images';
+        photosSpinner.classList.add('hidden');
+      }
+    }
+  </script>
+</body>
+</html>
